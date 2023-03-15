@@ -1,0 +1,19 @@
+---
+dependencies: []
+
+galaxy_info:
+  author: nerve4 - Lee
+  description: Install ETCD Cluster on Nix Servers
+  license: "license (BSD, MIT)"
+  min_ansible_version: 2.4
+  platforms:
+    - name: Ubuntu
+      versions:
+        - 20
+        - 22
+  galaxy_tags:
+    - microservices
+    - etcd
+    - etcd-cluster
+
+allow_duplicates: true

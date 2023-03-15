@@ -1,0 +1,124 @@
+---
+# set-prerequisites.yml for nerve4-etcd-clu
+
+- name: Update hostnames
+  ansible.builtin.hostname:
+    name: "{{ new_hostname }}"
+
+- name: Ensure group "{{ etcd_group }}" exists with correct gid
+  ansible.builtin.group:
+    name: "{{ etcd_group }}"
+    gid: "{{ etcd_group_id }}"
+    state: present
+
+- name: Ensure user "{{ etcd_user }}" exists with correct uid
+  ansible.builtin.user:
+    name: "{{ etcd_user }}"
+    comment: "Dedicated etcd user"
+    uid: "{{ etcd_user_id }}"
+    group: "{{ etcd_group }}"
+    create_home: "{{ etcd_create_home }}"
+    system: "{{ etcd_system_user }}"
+    shell: "{{ etcd_user_shell }}"
+
+- name: Download etcd binary to remote directory
+  ansible.builtin.get_url:
+    url: "https://github.com/etcd-io/etcd/releases/download/v{{ etcd_version }}/etcd-v{{ etcd_version }}-{{etcd_os }}-{{ etcd_os_arch }}.tar.gz"
+    dest: "/tmp/etcd-v{{ etcd_version }}-{{etcd_os }}-{{ etcd_os_arch }}.tar.gz"
+    checksum: "sha256:{{ etcd_checksum }}"
+
+- name: unpack etcd binary
+  ansible.builtin.unarchive:
+    src: "/tmp/etcd-v{{ etcd_version }}-{{etcd_os }}-{{ etcd_os_arch }}.tar.gz"
+    dest: "/tmp"
+    remote_src: yes
+
+- name: Move etcd* files to /usr/loca/bin directory
+  become: yes
+  ansible.builtin.shell: |
+    sudo mv "/tmp/etcd-v{{ etcd_version }}-{{etcd_os }}-{{ etcd_os_arch }}"/etcd* /usr/local/bin/
+
+- name: Remove old etcd directory
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "/tmp/etcd-v{{ etcd_version }}-{{etcd_os }}-{{ etcd_os_arch }}"
+    - "/tmp/etcd-v{{ etcd_version }}-{{etcd_os }}-{{ etcd_os_arch }}.tar.gz"
+
+- name: Create a etcd data direcotry if it does not exist
+  become: yes
+  ansible.builtin.file:
+    path: "{{ etcd_data_directory }}"
+    state: directory
+    mode: 700
+    owner: "{{ etcd_user }}"
+    group: "{{ etcd_group }}"
+
+- name: Download cfssl & cfssljson on 1st etcd host
+  become: yes
+  ansible.builtin.get_url:
+    url: "{{ item }}"
+    dest: "/usr/local/bin/"
+    mode: "u+x"
+    owner: "root"
+    group: "root"
+  loop: 
+    - "{{ cfssl_link }}"
+    - "{{ cfssljson_link }}"
+  when: etcd1_var is defined and etcd1_var
+
+- name: Create a etcd cacert directory if it does not exist
+  become: yes
+  ansible.builtin.file:
+    path: "{{ ca_cert_path }}"
+    state: directory
+    mode: '0644'
+    owner: root
+    group: root
+
+- name: Upload ca-config.json on 1st etcd host
+  become: yes
+  ansible.builtin.template:
+    src: ca-config.j2
+    dest: "{{ ca_cert_path }}/ca-config.json"
+    owner: root
+    group: root
+    mode: '0644'
+  when: etcd1_var is defined and etcd1_var
+
+- name: Upload ca-config.json on 1st etcd host
+  become: yes
+  ansible.builtin.template:
+    src: ca-csr.j2
+    dest: "{{ ca_cert_path }}/ca-csr.json"
+    owner: root
+    group: root
+    mode: '0644'
+  when: etcd1_var is defined and etcd1_var
+
+- name: Create CA certificate and key on 1st etcd host
+  become: yes
+  ansible.builtin.shell: |
+    /usr/local/bin/cfssl gencert -initca {{ ca_cert_path }}/ca-csr.json | /usr/local/bin/cfssljson -bare ca
+  args:
+    chdir: "{{ ca_cert_path }}"
+  when: etcd1_var is defined and etcd1_var
+
+- name: Upload etcd-csr.json on 1st etcd host
+  become: yes
+  ansible.builtin.template:
+    src: etcd-csr.j2
+    dest: "{{ ca_cert_path }}/etcd-csr.json"
+    owner: root
+    group: root
+    mode: '0644'
+  when: etcd1_var is defined and etcd1_var
+
+- name: Create Server certificate and key on 1st etcd host
+  become: yes
+  ansible.builtin.shell: |
+    /usr/local/bin/cfssl gencert -ca={{ ca_cert_path }}/ca.pem -ca-key={{ ca_cert_path }}/ca-key.pem -config={{ ca_cert_path }}/ca-config.json -profile=etcd {{ ca_cert_path }}/etcd-csr.json | /usr/local/bin/cfssljson -bare etcd
+  args:
+    chdir: "{{ ca_cert_path }}"
+  when: etcd1_var is defined and etcd1_var

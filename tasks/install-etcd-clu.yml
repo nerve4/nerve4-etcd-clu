@@ -1,0 +1,52 @@
+---
+# install-etcd-clu.yml for nerve4-etcd-clu
+
+- name: Upload hosts file on All etcd hosts
+  become: yes
+  ansible.builtin.template:
+    src: hosts.j2
+    dest: /etc/hosts
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Upload etcd.service file on 1st etcd host
+  become: yes
+  ansible.builtin.template:
+    src: etcd-1.j2
+    dest: "/etc/systemd/system/etcd.service"
+    owner: root
+    group: root
+    mode: '0644'
+  when: etcd1_var is defined and etcd1_var
+
+- name: Upload etcd.service file on 2nd etcd host
+  become: yes
+  ansible.builtin.template:
+    src: etcd-2.j2
+    dest: "/etc/systemd/system/etcd.service"
+    owner: root
+    group: root
+    mode: '0655'
+  when: etcd2_var is defined and etcd2_var
+
+- name: Upload etcd.service file on 3rd etcd host
+  become: yes
+  ansible.builtin.template:
+    src: etcd-3.j2
+    dest: "/etc/systemd/system/etcd.service"
+    owner: root
+    group: root
+    mode: '0655'
+  when: etcd3_var is defined and etcd3_var
+
+- name: Just force systemd to re-execute itself
+  become: yes
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Enable and start etcd service
+  ansible.builtin.systemd:
+    name: etcd
+    state: started
+    enabled: true
