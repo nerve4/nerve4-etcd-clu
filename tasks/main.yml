@@ -1,0 +1,6 @@
+---
+# tasks - main.yml for nerve4-etcd-clu
+
+- include_tasks: set-prerequisites.yml
+- include_tasks: temp-ssl-transition.yml
+- include_tasks: install-etcd-clu.yml

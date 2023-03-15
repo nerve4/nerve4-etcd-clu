@@ -1,0 +1,42 @@
+---
+# temp-ssl-transition.yml for nerve4-etcd-clu
+####################################################
+# We have an issue with ansible.posix.synchronize, #
+# so this is a temporary solution, which will be   #
+# depricated in the future versions.               #
+####################################################
+- name: Download etcd-certs files to local
+  become: yes
+  ansible.builtin.fetch:
+    src: "{{ item }}"
+    dest: /tmp/
+    flat: yes
+  loop: 
+    - "{{ ca_cert_path }}/ca.pem"
+    - "{{ ca_cert_path }}/etcd.pem"
+    - "{{ ca_cert_path }}/etcd-key.pem"
+  when: etcd1_var is defined and etcd1_var
+
+- name: Upload etcd-certs files to 2nd etcd host
+  become: yes
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ ca_cert_path }}/"
+  loop: 
+    - "/tmp/ca.pem"
+    - "/tmp/etcd.pem"
+    - "/tmp/etcd-key.pem"
+  when: 
+    - etcd2_var is defined and etcd2_var
+
+- name: Upload etcd-certs files to 3rd etcd host
+  become: yes
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ ca_cert_path }}/"
+  loop: 
+    - "/tmp/ca.pem"
+    - "/tmp/etcd.pem"
+    - "/tmp/etcd-key.pem"
+  when: 
+    - etcd3_var is defined and etcd3_var
